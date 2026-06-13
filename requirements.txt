@@ -1,0 +1,45 @@
+# LangChain Core
+langchain
+langchain-core
+langchain-community
+langchain-text-splitters
+
+# Mistral AI
+langchain-mistralai
+mistralai
+
+# Hugging Face Embeddings
+sentence-transformers
+huggingface-hub
+
+# Vector Database
+faiss-cpu
+
+# YouTube Transcript
+youtube-transcript-api
+
+# Streamlit UI
+streamlit
+
+# Environment Variables
+python-dotenv
+
+# Tokenization
+tiktoken
+
+# Data Processing
+pandas
+numpy
+
+# HTTP Requests
+requests
+
+# PDF Support (Optional)
+pypdf
+
+# Utilities
+tqdm
+
+#langchain-Huggingface
+
+langchain_huggingface

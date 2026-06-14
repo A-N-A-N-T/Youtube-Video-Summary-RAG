@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from youtube_transcript_api import YouTubeTranscriptApi
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 from embeddingModel import embedding_model
 from llmModel import llm
 from PromptTemplates.SummaryPromptTemplate import summary_prompt
@@ -12,7 +13,10 @@ from langchain_core.runnables import (
     RunnableLambda,
     RunnablePassthrough
 )
+from PromptTemplates.notesPromptTemplates import notesPrompt
 from langchain_core.output_parsers import StrOutputParser
+
+from PdfGenerator.pdfGen import create_notes_pdf
 from urllib.parse import urlparse, parse_qs
 
 
@@ -80,16 +84,38 @@ def create_vector_store(url):
 
     raw_transcript = transcript_list.to_raw_data()
 
-    transcript = " ".join(
-        chunk["text"] for chunk in raw_transcript
-    )
+    # transcript = " ".join(
+    #     chunk["text"] for chunk in raw_transcript
+    # )
 
+    # This is how we store metadata
+     
+    document = []
+
+    for chunk in raw_transcript:
+        document.append(
+            Document(
+                page_content=chunk["text"],
+                metadata={
+                    "start" : chunk["start"],
+                    "duration" : chunk["duration"]
+                }
+            )
+        )
+    
+    
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200
     )
 
-    chunks = splitter.create_documents([transcript])
+    # This is how we split the raw text
+    # chunks = splitter.create_documents([transcript])
+
+    # Now let see how we can split the document(langchain - docs)
+
+    chunks = splitter.split_documents(document)  # now this gonna preserve the metadata in the docs 
+
 
     vector_store = FAISS.from_documents(
         documents=chunks,
@@ -133,6 +159,12 @@ def get_answer(vector_store, question):
     }
 
 
+
+def formatTimeStamp(time):
+    minutes = int(time // 60)
+    seconds = int(time % 60)
+    return f"{minutes:02d}:{seconds:02d}"
+
 # ------------------ UI ------------------
 
 # -----------------------------
@@ -175,7 +207,7 @@ question = st.text_area(
 # Buttons
 # -----------------------------
 
-col1, col2 = st.columns(2)
+col1, col2 , col3 = st.columns(3)
 
 with col1:
     answer_btn = st.button(
@@ -188,7 +220,11 @@ with col2:
         "📝 Generate Summary",
         use_container_width=True
     )
-
+with col3:
+    notes_btn = st.button(
+        "📋 Generate Notes",
+        use_container_width=True
+    )
 # -----------------------------
 # Q&A Section
 # -----------------------------
@@ -244,6 +280,9 @@ if answer_btn:
                 with st.expander(f"Chunk {i}"):
 
                    st.write(doc.page_content)
+                   st.divider()
+                   st.write("TimeStamps is : ")
+                   st.write(formatTimeStamp(doc.metadata["start"]))
 
         except Exception as e:
 
@@ -278,7 +317,29 @@ if summary_btn:
 
             st.error(f"Error: {e}")
 
-    # Display the history..........
+#-----------------------------------
+#   Notes
+#-----------------------------------
+
+if notes_btn:
+    notes = getSummary(
+        youtube_url,
+        notesPrompt
+    )
+    st.success("Notes Generated Sucessfully")
+    st.subheader("📋 Video Notes")
+    st.write(notes)
+    pdf_file = create_notes_pdf(notes)
+
+    st.download_button(
+     label="⬇ Download Notes as PDF",
+     data=pdf_file,
+     file_name="youtube_notes.pdf",
+     mime="application/pdf"
+    )
+
+
+# Display the history..........
 
 if st.session_state.qa_history:
 

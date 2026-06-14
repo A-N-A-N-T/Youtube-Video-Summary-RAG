@@ -43,3 +43,7 @@ tqdm
 #langchain-Huggingface
 
 langchain_huggingface
+
+# pdf generation library
+
+reportlab

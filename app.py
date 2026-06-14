@@ -19,6 +19,16 @@ from urllib.parse import urlparse, parse_qs
 load_dotenv()
 
 
+if "vector_store" not in st.session_state:
+    st.session_state.vector_store = None
+
+if "loaded_url" not in st.session_state:
+    st.session_state.loaded_url = None
+
+if "qa_history" not in st.session_state:
+    st.session_state.qa_history = []
+
+
 def format_docs_come_from_store(retrieved_doc):
     context_text = "\n\n".join(
         docs.page_content for docs in retrieved_doc
@@ -56,32 +66,23 @@ def getSummary(url,SummaryPrompt):
     except Exception as e:
         return f"Transcript not available.\n\nError: {e}"
     
-    
 
-
-def get_answer(url, question):
+def create_vector_store(url):
 
     video_id = parse_qs(
         urlparse(url).query
     ).get("v", [None])[0]
 
-    if not video_id:
-        return "Invalid YouTube URL"
+    transcript_list = YouTubeTranscriptApi().fetch(
+        video_id,
+        languages=["en"]
+    )
 
-    try:
-        transcript_list = YouTubeTranscriptApi().fetch(
-            video_id,
-            languages=["en"]
-        )
+    raw_transcript = transcript_list.to_raw_data()
 
-        raw_transcript = transcript_list.to_raw_data()
-
-        transcript = " ".join(
-            chunk["text"] for chunk in raw_transcript
-        )
-
-    except Exception as e:
-        return f"Transcript not available.\n\nError: {e}"
+    transcript = " ".join(
+        chunk["text"] for chunk in raw_transcript
+    )
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -95,6 +96,12 @@ def get_answer(url, question):
         embedding=embedding_model
     )
 
+    return vector_store
+
+
+def get_answer(vector_store, question):
+
+    
     retriever = vector_store.as_retriever(
         search_type="similarity",
         search_kwargs={"k": 4}
@@ -199,12 +206,30 @@ if answer_btn:
     with st.spinner("Analyzing video and generating answer..."):
 
         try:
+            if (
+            st.session_state.vector_store is None
+            or st.session_state.loaded_url != youtube_url
+           ):
+
+
+              st.session_state.vector_store = create_vector_store(
+              youtube_url
+              )
+              st.session_state.loaded_url = youtube_url
+            #   print(st.session_state.loaded_url)
+            #   print(youtube_url)
             answer = get_answer(
-                youtube_url,
-                question
-            )
+              st.session_state.vector_store,
+              question
+          )
             result = answer["result"]
             sources = answer["src"]
+            st.session_state.qa_history.append(
+            {
+                  "question": question,
+                 "answer": result
+            }
+)
 
             st.success("Answer Generated Successfully")
 
@@ -252,6 +277,29 @@ if summary_btn:
         except Exception as e:
 
             st.error(f"Error: {e}")
+
+    # Display the history..........
+
+if st.session_state.qa_history:
+
+
+    st.divider()
+
+    st.subheader("📜 Question History")
+    delete_btn = st.button(
+        "Delete History",
+        use_container_width=True
+    )
+
+
+    for item in reversed(st.session_state.qa_history):
+
+        with st.expander(item["question"]):
+
+            st.write(item["answer"])
+    
+    if delete_btn:
+        st.session_state.qa_history = []
 
 # -----------------------------
 # Footer

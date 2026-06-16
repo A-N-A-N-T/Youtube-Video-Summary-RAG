@@ -47,3 +47,8 @@ langchain_huggingface
 # pdf generation library
 
 reportlab
+
+# for backend 
+
+fastapi
+uvicorn
